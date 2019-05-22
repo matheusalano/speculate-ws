@@ -10,7 +10,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 enum SpeculateStatus {
-    AGUARDANDO_JOGADOR, VEZ_JOG01, VEZ_JOG02, ENC_JOG01, ENC_JOG02, WO_JOG01, WO_JOG02, TEMPO_ESGOTADO;
+    AGUARDANDO_JOGADOR, VEZ_JOG01, VEZ_JOG02, ENC_JOG01, ENC_JOG02, WO_JOG01, WO_JOG02, TEMPO_ESGOTADO, PRE_REGISTRO;
 }
 
 /**
@@ -25,7 +25,7 @@ public class Speculate {
     private int numLancamentos;
     private int dado;
     private SpeculateStatus status;
-    private Random gerador; // = new Random(2908002);
+    private Random gerador;
     private Timer timer;
     private TimerTask task;
 
@@ -72,11 +72,29 @@ public class Speculate {
     }
 
     public void adicionaJogador(Jogador jog) {
+        if (status == SpeculateStatus.PRE_REGISTRO) {
+            adicionaJogadorTeste(jog);
+            return;
+        }
+        
         int temVaga = this.temVaga();
         if (temVaga == 2) {
             this.jogador01 = jog;
             esperaJogador();
         } else if (temVaga == 1) {
+            this.jogador02 = jog;
+            this.gerador = new Random(this.jogador01.getIdentifier() + this.jogador02.getIdentifier());
+            this.status = SpeculateStatus.VEZ_JOG01;
+            task.cancel();
+            esperaJogada();
+        }
+    }
+    
+    private void adicionaJogadorTeste(Jogador jog) {
+        if (jogador01 == null) {
+            this.jogador01 = jog;
+            esperaJogador();
+        } else {
             this.jogador02 = jog;
             this.gerador = new Random(this.jogador01.getIdentifier() + this.jogador02.getIdentifier());
             this.status = SpeculateStatus.VEZ_JOG01;
@@ -100,6 +118,8 @@ public class Speculate {
 
     public int temPartida(int idUsuario) {
         switch (status) {
+            case PRE_REGISTRO:
+                return 0;
             case AGUARDANDO_JOGADOR:
                 return 0;
             case TEMPO_ESGOTADO:
@@ -114,13 +134,15 @@ public class Speculate {
     }
 
     public String obtemOponente(int idUsuario) {
-        if (status == SpeculateStatus.AGUARDANDO_JOGADOR) { return ""; }
+        if (status == SpeculateStatus.AGUARDANDO_JOGADOR || status == SpeculateStatus.PRE_REGISTRO) { return ""; }
 
         return (jogador01.getIdentifier() == idUsuario) ? jogador02.getNome() : jogador01.getNome();
     }
 
     public int ehMinhaVez(int idUsuario) {
         switch (status) {
+            case PRE_REGISTRO:
+                return -2;
             case AGUARDANDO_JOGADOR:
                 return -2;
             case VEZ_JOG01:
@@ -157,7 +179,7 @@ public class Speculate {
     }
 
     public int defineJogadas(int idUsuario, int numLancamentos) {
-        if (status == SpeculateStatus.AGUARDANDO_JOGADOR) { return -2; }
+        if (status == SpeculateStatus.AGUARDANDO_JOGADOR || status == SpeculateStatus.PRE_REGISTRO) { return -2; }
 
         if (jogador01.getIdentifier() == idUsuario) {
             if (status != SpeculateStatus.VEZ_JOG01) { return -3; }
@@ -188,7 +210,7 @@ public class Speculate {
             if (this.numLancamentos == -1) { return -4; }
             
             esperaJogada();
-            dado = gerador.nextInt(5) + 1;
+            dado = gerador.nextInt(6) + 1;
             atualizaJogo(idUsuario);
             
             if (jogador01.getBolas() == 0) { status = SpeculateStatus.ENC_JOG01; }
@@ -199,7 +221,7 @@ public class Speculate {
             if (this.numLancamentos == -1) { return -4; }
 
             esperaJogada();
-            dado = gerador.nextInt(5) + 1;
+            dado = gerador.nextInt(6) + 1;
             atualizaJogo(idUsuario);
             
             if (jogador02.getBolas() == 0) { status = SpeculateStatus.ENC_JOG02; }
@@ -208,6 +230,10 @@ public class Speculate {
         }
 
         return -1;
+    }
+    
+    public void preparaParaTeste() {
+        status = SpeculateStatus.PRE_REGISTRO;
     }
 
     private void atualizaJogo(int idUsuario) {
